@@ -60,6 +60,40 @@ var objectRegexp = /^([a-z]+):([a-z]+):.*$/i,
       }
     );
 
+var Status = function() {
+  this.status = Status.PENDING;
+  this.value = null;
+  this.callbacks = [];
+};
+Status.PENDING = 'pending';
+Status.COMPLETED = 'completed';
+Status.prototype.resolve = function(value) {
+  this.status = Status.COMPLETED;
+  this.value = value;
+  this.notifyAll();
+};
+Status.prototype.notifyAll = function() {
+  var i;
+  
+  for (i in this.callbacks) {
+    this.notify(this.callbacks[i]);
+  }
+};
+Status.prototype.notify = function(callback) {
+  var self = this;
+  
+  process.nextTick(function() {
+    callback(self.value);
+  });
+};
+Status.prototype.when = function(callback) {
+  if (this.status === Status.PENDING) {
+    this.callbacks.push(callback);
+  } else {
+    this.notify(callback);
+  }
+};
+
 var convert = exports.convert = function (type, id, callback) {
   var target, i,
       options = {},
