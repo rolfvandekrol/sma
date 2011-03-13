@@ -34,10 +34,16 @@ var objectRegexp = /^([a-z]+):([a-z]+):.*$/i,
       function(types) {
         return {
           'http:link': {
-            'youtube:video': [
-              {'http:link': ROOT},
-              {'youtube:video': TARGET}
-            ]
+            'youtube:video': {
+              'route': [
+                'http:link',
+                'youtube:video'
+              ],
+              'method': [
+                ROOT,
+                TARGET
+              ]
+            }
           }
         };
       }
