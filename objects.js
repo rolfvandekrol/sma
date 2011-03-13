@@ -1,0 +1,135 @@
+var objectRegexp = /^([a-z]+):([a-z]+):.*$/i,
+    typeRegexp = /^([a-z]+):([a-z]+)$/i,
+    
+    ROOT = 'root',
+    SOURCE = 'source',
+    TARGET = 'target'
+    
+    conversionTypes = (
+      function () {
+        var fs = require('fs'),
+            types = {},
+            
+            js = /([a-z]+)\.js/,
+            filenames = fs.readdirSync(__dirname + '/objects'),
+            files = {},
+            m, key, file;
+        
+        for (i in filenames) {
+          m = filenames[i].match(js);
+          if (m) {
+            file = require('./objects/' + m[1]);
+            for (key in file) {
+              types[m[1] + ':' + key] = file[key];
+            }
+          }
+        }
+        
+        return types;
+      }
+    ()),
+    conversionTree = (
+      // TODO: Change this to logic that inspects the objects to define the 
+      // available conversion paths
+      function(types) {
+        return {
+          'http:link': {
+            'youtube:video': [
+              {'http:link': ROOT},
+              {'youtube:video': TARGET}
+            ]
+          }
+        };
+      }
+    ());
+    conversionLogic = (
+      // TODO: Change this to logic that inspects the objects and the outweighs
+      // parameters to define the preferered conversions
+      function(types) {
+        return {
+          'http:link': [
+            'youtube:video'
+          ]
+        };
+      }
+    );
+
+var convert = exports.convert = function (type, id, callback) {
+  var target, i,
+      options = {},
+      result = [],
+      conversion;
+  
+  if (conversionLogic[type] === undefined) {
+    callback(new Error('No conversion logic available for this type'));
+    return;
+  }
+  
+  conversion = function(type, id, callback) {
+    var results = {};
+    results[type] = id;
+    
+    var output = {};
+    
+    var report = {};
+    
+    var c = function(target, callback) {
+      var steps = conversionTree[type][target],
+          i;
+      
+      for (i in steps) {
+        
+      }
+    };
+    
+    // loop over the preferred conversion targets
+    for (i in conversionLogic[type]) {
+      c(conversionLogic[type][i], function(err, type, id) {
+        
+      });
+    }
+  };
+  
+  valuni(type, id, function(err, new_id) {
+    if (err === null) {
+      
+    } else {
+      callback(err);
+    }
+  });
+};
+
+/**
+ * Encapsulates validation and unification and provides simple dummy functions
+ * for types without a validation and/or unification method.
+ */
+var valnuni = exports.valuni =  function(type, id, callback) {
+  var dummy = function (id, callback) {
+        callback(null, id);
+      },
+      finder = function(type, action) {
+        if (conversionTypes[type][action] !== undefined) {
+          return function(id, callback) {
+            conversionTypes[type][action](id, callback);
+          };
+        } else {
+          return dummy;
+        }
+      },
+      val = finder(type, 'validate'),
+      uni = finder(type, 'unify');
+  
+  val(id, function(err, id) {
+    if (err === null) {
+      uni(id, function(err, id) {
+        if (err === null) {
+          callback(null, id);
+        } else {
+          callback(err);
+        }
+      });
+    } else {
+      callback(err);
+    }
+  });
+};

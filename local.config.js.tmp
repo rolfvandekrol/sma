@@ -1,0 +1,15 @@
+var conf = exports.configuration = {
+  'services': {
+    'twitter': {
+      'username': 'username',
+      'password': 'password'
+    },
+    'github': {
+      'username': 'username',
+      'password': 'password',
+    }
+  },
+  'database': {
+    'path': ''
+  }
+};
