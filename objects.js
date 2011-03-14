@@ -65,19 +65,25 @@ var Status = function(value) {
   
   if (value === undefined) {
     this.status = Status.PENDING;
-    this.value = null;
   } else {
-    this.status = Status.COMPLETED;
+    this.status = Status.RESOLVED;
     this.value = value;
   }
 };
-Status.PENDING = 'pending';
-Status.COMPLETED = 'completed';
+Status.PENDING = 0;
+Status.RESOLVED = 1;
+Status.REJECTED = -1;
+
 Status.prototype.resolve = function(value) {
-  this.status = Status.COMPLETED;
+  this.status = Status.RESOLVED;
   this.value = value;
   this.notifyAll();
 };
+Status.prototype.reject = function(msg) {
+  this.status = Status.REJECTED;
+  this.error = new Error(msg);
+  this.notifyAll();
+}
 Status.prototype.notifyAll = function() {
   var i;
   
@@ -88,9 +94,15 @@ Status.prototype.notifyAll = function() {
 Status.prototype.notify = function(callback) {
   var self = this;
   
-  process.nextTick(function() {
-    callback(self.value);
-  });
+  if (this.status === Status.RESOLVED) {
+    process.nextTick(function() {
+      callback(null, self.value);
+    });
+  } else {
+    process.nextTick(function() {
+      callback(self.error);
+    });
+  }
 };
 Status.prototype.when = function(callback) {
   if (this.status === Status.PENDING) {
