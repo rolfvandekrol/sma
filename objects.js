@@ -1,9 +1,9 @@
 var objectRegexp = /^([a-z]+):([a-z]+):.*$/i,
     typeRegexp = /^([a-z]+):([a-z]+)$/i,
     
-    ROOT = 'root',
     SOURCE = 'source',
-    TARGET = 'target'
+    TARGET = 'target',
+    GOAL = 'goal',
     
     conversionTypes = (
       function () {
@@ -40,8 +40,8 @@ var objectRegexp = /^([a-z]+):([a-z]+):.*$/i,
                 'youtube:video'
               ],
               'method': [
-                ROOT,
-                TARGET
+                TARGET,
+                GOAL
               ]
             }
           }
