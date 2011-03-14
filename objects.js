@@ -60,10 +60,16 @@ var objectRegexp = /^([a-z]+):([a-z]+):.*$/i,
       }
     );
 
-var Status = function() {
-  this.status = Status.PENDING;
-  this.value = null;
+var Status = function(value) {
   this.callbacks = [];
+  
+  if (value === undefined) {
+    this.status = Status.PENDING;
+    this.value = null;
+  } else {
+    this.status = Status.COMPLETED;
+    this.value = value;
+  }
 };
 Status.PENDING = 'pending';
 Status.COMPLETED = 'completed';
