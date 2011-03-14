@@ -134,20 +134,104 @@ var convert = exports.convert = function (type, id, callback) {
   
   conversion = function(type, id, callback) {
     var results = {};
-    results[type] = id;
+    results[type] = new Status(id);
     
     var output = {};
     
-    var report = {};
-    
     var c = function(target, callback) {
-      var steps = conversionTree[type][target],
-          i;
+      var i, // iterator keys
+          reported = false,
+          error = function(msg) {
+            if (!reported) {
+              reported = true;
+              callback(new Error(msg));
+            }
+          },
+          finished = function(value) {
+            if (!reported) {
+              reported = true;
+              callback(null, value);
+            }
+          };
       
-      for (i in steps) {
+      for (i in conversionTree[type][target].route) {
+        // conversionTree[type][target].method[j] = way to get to the next
+        // conversionTree[type][target].route[j+1] = next step
+        (function(j) {
         
+          if (results[conversionTree[type][target].route[j]] === undefined) {
+            error('Conversion error. Source step not available. Probably a mistake in the conversionTree generation');
+            return;
+          }
+          
+          // TODO DRY
+          if (conversionTree[type][target].method[j] == SOURCE) {
+            if (conversionTypes[conversionTree[type][target].route[j]].convert.to[conversionTree[type][target].route[j+1]] === undefined) {
+              error('Conversion error. Conversion function not available. Probably a mistake in the conversionTree generation.');
+              return;
+            }
+            
+            if (results[conversionTree[type][target].route[j+1]] === undefined) {
+              results[conversionTree[type][target].route[j+1]] = new Status();
+              
+              results[conversionTree[type][target].route[j]].when(function(err, value) {
+                if (err !== null) {
+                  error(err.message);
+                  return;
+                }
+                
+                conversionTypes[conversionTree[type][target].route[j]].convert.to[conversionTree[type][target].route[j+1]](value, function(err, value) {
+                  if (err !== null) {
+                    results[conversionTree[type][target].route[j+1]].reject(err.message);
+                    return;
+                  }
+                  results[conversionTree[type][target].route[j+1]].resolve(value);
+                });
+              });
+            }
+            
+          } else if (conversionTree[type][target].method[j] == TARGET) {
+            if (conversionTypes[conversionTree[type][target].route[j+1]].convert.from[conversionTree[type][target].route[j]] === undefined) {
+              error('Conversion error. Conversion function not available. Probably a mistake in the conversionTree generation.');
+              return;
+            }
+            
+            if (results[conversionTree[type][target].route[j+1]] === undefined) {
+              results[conversionTree[type][target].route[j+1]] = new Status();
+              
+              results[conversionTree[type][target].route[j]].when(function(err, value) {
+                if (err !== null) {
+                  error(err.message);
+                  return;
+                }
+                
+                conversionTypes[conversionTree[type][target].route[j+1]].convert.from[conversionTree[type][target].route[j]](value, function(err, value) {
+                  if (err !== null) {
+                    results[conversionTree[type][target].route[j+1]].reject(err.message);
+                    return;
+                  }
+                  results[conversionTree[type][target].route[j+1]].resolve(value);
+                });
+              });
+            }
+          } else if (conversionTree[type][target].method[j] == GOAL) {
+            results[conversionTree[type][target].route[j]].when(function(err, value) {
+              if (err !== null) {
+                error(err.message);
+                return;
+              }
+              
+              finished(value);
+            });
+          } else {
+            error('Conversion error. Unregcognized conversion method. Probably a mistake in the conversionTree generation');
+            return;
+          }
+        })(parseInt(i));
       }
-    };
+    }; // end c
+    
+    var counter = 0;
     
     // loop over the preferred conversion targets
     for (i in conversionLogic[type]) {
