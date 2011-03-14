@@ -43,6 +43,14 @@ var objectRegexp = /^([a-z]+):([a-z]+):.*$/i,
                 TARGET,
                 GOAL
               ]
+            },
+            'http:link': {
+              'route': [
+                'http:link'
+              ],
+              'method': [
+                GOAL
+              ]
             }
           }
         };
@@ -54,11 +62,12 @@ var objectRegexp = /^([a-z]+):([a-z]+):.*$/i,
       function(types) {
         return {
           'http:link': [
+            'http:link',
             'youtube:video'
           ]
         };
       }
-    );
+    )(conversionTypes);
 
 var Status = function(value) {
   this.callbacks = [];
