@@ -254,7 +254,7 @@ var convert = exports.convert = function (type, id, callback) {
  * Encapsulates validation and unification and provides simple dummy functions
  * for types without a validation and/or unification method.
  */
-var valnuni = exports.valuni =  function(type, id, callback) {
+var valuni = exports.valuni =  function(type, id, callback) {
   var dummy = function (id, callback) {
         callback(null, id);
       },
