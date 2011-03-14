@@ -235,15 +235,29 @@ var convert = exports.convert = function (type, id, callback) {
     
     // loop over the preferred conversion targets
     for (i in conversionLogic[type]) {
-      c(conversionLogic[type][i], function(err, type, id) {
-        
-      });
+      (function(i) {
+        c(conversionLogic[type][i], function(err, id) {
+          // errors are nothing to worry about here. An error just means that some
+          // conversion couldn't succeed, which is very common.
+          if (err === null) {
+            output[conversionLogic[type][i]] = id;
+          } else {
+          }
+          counter += 1;
+          
+          if (counter == conversionLogic[type].length) {
+            callback(null, output);
+          }
+        });
+      })(i);
     }
   };
   
   valuni(type, id, function(err, new_id) {
     if (err === null) {
-      
+      conversion(type, new_id, function(err, result) {
+        callback(err, result);
+      });
     } else {
       callback(err);
     }
