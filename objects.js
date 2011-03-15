@@ -34,45 +34,87 @@ var objectRegexp = /^([a-z]+):([a-z]+):.*$/i,
       function(types) {
         var paths = {};
         var done = {};
+        
         var find = function(type) {
           var key;
+          
           done[type] = true;
           
           for (key in types) {
-            if (types[type].convert !== undefined && types[type].convert.to !== undefined && types[type].convert.to[key] !== undefined) {
-              // to logic
-            } else if (types[key].convert !== undefined && types[key].convert.from !== undefined && types[key].convert.from[type] !== undefined) {
+            // we prefer from logic, because we assume the target knows better
+            // how to convert to itself, than the source knows how to convert
+            // to a target
+            if (types[key].convert !== undefined && types[key].convert.from !== undefined && types[key].convert.from[type] !== undefined) {
               // from logic
-            } else {
-              // no logic
+              if (register(type, key, TARGET)) {
+                find(key);
+              }
+            } else if (types[type].convert !== undefined && types[type].convert.to !== undefined && types[type].convert.to[key] !== undefined) {
+              // to logic
+              if(register(type, key, SOURCE)) {
+                find(key);
+              }
             }
           }
         };
         
-        return {
-          'http:link': {
-            'youtube:video': {
-              'route': [
-                'http:link',
-                'youtube:video'
-              ],
-              'method': [
-                TARGET,
-                GOAL
-              ]
-            },
-            'http:link': {
-              'route': [
-                'http:link'
-              ],
-              'method': [
-                GOAL
-              ]
+        var inarray = function(a, i) {
+          var j;
+          for (j in a) {
+            if (a[j] === i) {
+              return true;
             }
           }
+          
+          return false;
         };
+        
+        var register = function(s, t, method) {
+          var added = false,
+              item = {'route': [s,t], 'method': [method, GOAL]},
+              key;
+          
+          if (paths[s] === undefined) {
+            paths[s] = {};
+          }
+          
+          if ((paths[s][t] === undefined) || (paths[s][t].route.length > 2)) {
+            paths[s][t] = item;
+            added = true;
+          }
+          
+          for (key in paths) {
+            if (paths[key][s] !== undefined) {
+              if (!inarray(paths[key][s].route, t) && ((paths[key][t] === undefined) || (paths[key][t].route.length > (paths[key][s].route.length + 1)))) {
+                subregister(paths[key][s], t, method);
+                added = true;
+              }
+            }
+          }
+          
+          return added;
+        };
+        
+        var subregister = function(orig, target, method) {
+          var item = {route: orig.route.slice(0), method: orig.method.slice(0)};
+          item.route.push(target);
+          item.method.push(GOAL);
+          item.method[item.method.length-2] = method;
+          
+          paths[orig.route[0]][target] = item;
+        };
+        
+        var key;
+        for (key in types) {
+          if (done[key] === undefined) {
+            find(key);
+          }
+        }
+        
+        return paths;
       }
-    (conversionTypes));
+    (conversionTypes)),
+    
     conversionLogic = (
       // TODO: Change this to logic that inspects the objects and the outweighs
       // parameters to define the preferered conversions
