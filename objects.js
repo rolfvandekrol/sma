@@ -32,6 +32,23 @@ var objectRegexp = /^([a-z]+):([a-z]+):.*$/i,
       // TODO: Change this to logic that inspects the objects to define the 
       // available conversion paths
       function(types) {
+        var paths = {};
+        var done = {};
+        var find = function(type) {
+          var key;
+          done[type] = true;
+          
+          for (key in types) {
+            if (types[type].convert !== undefined && types[type].convert.to !== undefined && types[type].convert.to[key] !== undefined) {
+              // to logic
+            } else if (types[key].convert !== undefined && types[key].convert.from !== undefined && types[key].convert.from[type] !== undefined) {
+              // from logic
+            } else {
+              // no logic
+            }
+          }
+        };
+        
         return {
           'http:link': {
             'youtube:video': {
