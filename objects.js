@@ -40,8 +40,6 @@ var objectRegexp = /^([a-z]+):([a-z]+):.*$/i,
       }
     ()),
     conversionTree = (
-      // TODO: Change this to logic that inspects the objects to define the 
-      // available conversion paths
       function(types) {
         var paths = {};
         var done = {};
