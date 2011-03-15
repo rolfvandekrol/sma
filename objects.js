@@ -55,7 +55,7 @@ var objectRegexp = /^([a-z]+):([a-z]+):.*$/i,
           }
         };
       }
-    ());
+    (conversionTypes));
     conversionLogic = (
       // TODO: Change this to logic that inspects the objects and the outweighs
       // parameters to define the preferered conversions
