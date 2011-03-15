@@ -5,6 +5,17 @@ var objectRegexp = /^([a-z]+):([a-z]+):.*$/i,
     TARGET = 'target',
     GOAL = 'goal',
     
+    inarray = function(a, i) {
+      var j;
+      for (j in a) {
+        if (a[j] === i) {
+          return true;
+        }
+      }
+      
+      return false;
+    },
+    
     conversionTypes = (
       function () {
         var fs = require('fs'),
@@ -56,17 +67,6 @@ var objectRegexp = /^([a-z]+):([a-z]+):.*$/i,
               }
             }
           }
-        };
-        
-        var inarray = function(a, i) {
-          var j;
-          for (j in a) {
-            if (a[j] === i) {
-              return true;
-            }
-          }
-          
-          return false;
         };
         
         var register = function(s, t, method) {
