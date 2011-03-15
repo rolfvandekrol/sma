@@ -93,6 +93,17 @@ var objectRegexp = /^([a-z]+):([a-z]+):.*$/i,
           return added;
         };
         
+        var registerRoot = function(type) {
+          if (paths[type] === undefined) {
+            paths[type] = {};
+          }
+          
+          paths[type][type] = {
+            'route': [type],
+            'method': [GOAL]
+          };
+        };
+        
         var subregister = function(orig, target, method) {
           var item = {route: orig.route.slice(0), method: orig.method.slice(0)};
           item.route.push(target);
@@ -104,6 +115,7 @@ var objectRegexp = /^([a-z]+):([a-z]+):.*$/i,
         
         var key;
         for (key in types) {
+          registerRoot(key);
           if (done[key] === undefined) {
             find(key);
           }
