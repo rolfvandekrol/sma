@@ -218,7 +218,7 @@ var objectRegexp = /^([a-z]+):([a-z]+):.*$/i,
     // identify this.
     conversionLogic = (
       function(types) {
-            // Prepare empty result
+        // Prepare empty result
         var output = {},
             
             // Build the list of preferred paths for a type. If self is true
@@ -241,15 +241,14 @@ var objectRegexp = /^([a-z]+):([a-z]+):.*$/i,
                 if (types[key].outweighs !== undefined && 
                     inarray(types[key].outweighs, type)
                 ) {
-                    // Add the found type to the possible targets
-                    result.push(key);
-                    
-                    // Find the types that outweight the found type and add
-                    // those too.
-                    result2 = construct(key, false);
-                    for (key2 in result2) {
-                      result.push(result2[key2]);
-                    }
+                  // Add the found type to the possible targets
+                  result.push(key);
+                  
+                  // Find the types that outweight the found type and add
+                  // those too.
+                  result2 = construct(key, false);
+                  for (key2 in result2) {
+                    result.push(result2[key2]);
                   }
                 }
               }
@@ -351,8 +350,14 @@ Status.prototype.when = function(callback) {
   }
 };
 
+/**
+ * Convert from some type to a target. Expects a status object for the type
+ * to be registered in the results list.
+ */
 var convert = function(results, type, target, callback) {
-  var i, // iterator keys
+  var i, // Iterator key
+      
+      // Make sure we report only once to the callback
       reported = false,
       error = function(msg) {
         if (!reported) {
@@ -367,18 +372,27 @@ var convert = function(results, type, target, callback) {
         }
       };
   
+  // Loop over the conversion route
   for (i in conversionTree[type][target].route) {
-    // conversionTree[type][target].method[j] = way to get to the next
-    // conversionTree[type][target].route[j+1] = next step
     (function(j) {
       var method;
-    
+      
+      // If we do not have a status object registered for the source of this
+      // step, something is wrong. The caller or the previous step should have
+      // created this.
       if (results[conversionTree[type][target].route[j]] === undefined) {
-        error('Conversion error. Source step not available. Probably a mistake in the conversionTree generation');
+        error('Conversion error. Source step not available. ' + 
+          'Probably a mistake in the conversionTree generation');
         return;
       }
       
-      if (conversionTree[type][target].method[j] === SOURCE || conversionTree[type][target].method[j] === TARGET) {
+      // If the method is SOURCE or TARGET, we are supposed to do something
+      if (conversionTree[type][target].method[j] === SOURCE || 
+          conversionTree[type][target].method[j] === TARGET
+      ) {
+        // Find the function to use. If method is SOURCE, then the function is
+        // in the source object definition, otherwise in the target object 
+        // definition.
         if (conversionTree[type][target].method[j] === SOURCE) {
           method = {
             a: j,
@@ -392,38 +406,66 @@ var convert = function(results, type, target, callback) {
             m: 'from'
           };
         }
-        if (conversionTypes[conversionTree[type][target].route[method.a]].convert[method.m][conversionTree[type][target].route[method.b]] === undefined) {
-          error('Conversion error. Conversion function not available. Probably a mistake in the conversionTree generation.');
+        
+        // If the specified conversion method is not available, return an error.
+        if (conversionTypes[conversionTree[type][target].route[method.a]].
+            convert[method.m]
+            [conversionTree[type][target].route[method.b]] === undefined
+        ) {
+          error('Conversion error. Conversion function not available. ' + 
+            'Probably a mistake in the conversionTree generation.');
           return;
         }
         
+        // If there is no status object for our target available, we need to 
+        // create one. It's a very normal situation when an object already 
+        // exists, because more conversion routes are executed in parallel.
         if (results[conversionTree[type][target].route[j+1]] === undefined) {
+          // Create status object. This object will be waiting for the 
+          // conversion step to be executed.
           results[conversionTree[type][target].route[j+1]] = new Status();
           
-          results[conversionTree[type][target].route[j]].when(function(err, value) {
+          // When source status object is finished
+          results[conversionTree[type][target].route[j]].
+          when(function(err, value) {
+            // Pass through errors
             if (err !== null) {
               error(err.message);
               return;
             }
             
-            conversionTypes[conversionTree[type][target].route[method.a]].convert[method.m][conversionTree[type][target].route[method.b]](value, function(err, value) {
-              if (err !== null) {
-                results[conversionTree[type][target].route[j+1]].reject(err.message);
-                return;
+            // Execute conversion function
+            conversionTypes[conversionTree[type][target].route[method.a]].
+              convert[method.m]
+              [conversionTree[type][target].route[method.b]](value, function(err, value) {
+                // If conversion failed, reject the target status object
+                if (err !== null) {
+                  results[conversionTree[type][target].route[j+1]].reject(err.message);
+                  return;
+                }
+                
+                // Resolve target status object
+                results[conversionTree[type][target].route[j+1]].resolve(value);
               }
-              results[conversionTree[type][target].route[j+1]].resolve(value);
-            });
+            );
           });
         }
+      // If the conversion method is GOAL, we are supposed to return the result
+      // to our callback
       } else if (conversionTree[type][target].method[j] == GOAL) {
+        // When the conversion is finished
         results[conversionTree[type][target].route[j]].when(function(err, value) {
+          // Pass through errors
           if (err !== null) {
             error(err.message);
             return;
           }
           
+          // Conversion is done, return result
           finished(value);
         });
+      // This should never happen. If this happens the conversionTree generation
+      // went nuts
       } else {
         error('Conversion error. Unregcognized conversion method. Probably a mistake in the conversionTree generation');
         return;
@@ -432,58 +474,80 @@ var convert = function(results, type, target, callback) {
   }
 };
 
+/**
+ * External convert API function. Constructs a results list, containing a 
+ * resolved status object for the source type with the id for a value. It will
+ * call the conversion logic to convert to the target and report back to the 
+ * callback.
+ */
 exports.convert = function(s, id, t, callback) {
+  // Create results list
   var results = {};
   results[s] = new Status(id);
   
+  // Start conversion
   convert(results, s, t, callback);
 }
 
+/**
+ * External API function. Will do a conversion attempt for all types in the
+ * conversionLogic list for the given type and report the succeeded conversion
+ * results to the callback.
+ */
 var analyse = exports.analyse = function (type, id, callback) {
-  var target, i,
-      options = {},
-      result = [],
-      conversion;
+      // Actual conversion function
+  var conversion = function(type, id, callback) {
+            // Prepare results list
+        var results = {},
+            // Prepare empty output
+            output = {},
+            // The counter keeps track of how much conversions returned their 
+            // results, so we can determine whether we're finished or not.
+            counter = 0,
+            i;
+        
+        // Initialize resolved status object for the source object.
+        results[type] = new Status(id);
+        
+        // Loop over the preferred conversion targets
+        for (i in conversionLogic[type]) {
+          (function(i) {
+            // Perform the conversion
+            convert(results, type, conversionLogic[type][i], function(err, id) {
+              // Errors are nothing to worry about here. An error just means 
+              // that some conversion couldn't succeed, which is very common, so
+              // we literally ignore errors here.
+              if (err === null) {
+                output[conversionLogic[type][i]] = id;
+              } 
+              
+              // Add one to the counter
+              counter += 1;
+              
+              // Check if all conversions returned their results
+              if (counter == conversionLogic[type].length) {
+                // Send output
+                callback(null, output);
+              }
+            });
+          })(i);
+        }
+      };
   
+  // If no conversionLogic is available, which shouldn't happen, we cannot do
+  // anything, so we fail.
   if (conversionLogic[type] === undefined) {
     callback(new Error('No conversion logic available for this type'));
     return;
   }
   
-  conversion = function(type, id, callback) {
-    var results = {};
-    results[type] = new Status(id);
-    
-    var output = {};
-    
-    var counter = 0;
-    
-    // loop over the preferred conversion targets
-    for (i in conversionLogic[type]) {
-      (function(i) {
-        convert(results, type, conversionLogic[type][i], function(err, id) {
-          // errors are nothing to worry about here. An error just means that some
-          // conversion couldn't succeed, which is very common.
-          if (err === null) {
-            output[conversionLogic[type][i]] = id;
-          } else {
-          }
-          counter += 1;
-          
-          if (counter == conversionLogic[type].length) {
-            callback(null, output);
-          }
-        });
-      })(i);
-    }
-  };
-  
+  // Call validation and unification
   valuni(type, id, function(err, new_id) {
     if (err === null) {
-      conversion(type, new_id, function(err, result) {
-        callback(err, result);
-      });
+      // Start the conversion
+      conversion(type, new_id, callback);
     } else {
+      // Pass through the validation or unification error
       callback(err);
     }
   });
@@ -494,32 +558,34 @@ var analyse = exports.analyse = function (type, id, callback) {
  * for types without a validation and/or unification method.
  */
 var valuni = exports.valuni =  function(type, id, callback) {
+      // Dummy function if no validation of unification is available
   var dummy = function (id, callback) {
         callback(null, id);
       },
+      
+      // Return a method for validation or unification. Will return the dummy
+      // function, if the method is not available on the object type definition.
       finder = function(type, action) {
         if (conversionTypes[type][action] !== undefined) {
-          return function(id, callback) {
-            conversionTypes[type][action](id, callback);
-          };
+          return conversionTypes[type][action];
         } else {
           return dummy;
         }
       },
+      
+      // Validation function
       val = finder(type, 'validate'),
+      // Unification function
       uni = finder(type, 'unify');
   
+  // Validate
   val(id, function(err, id) {
     if (err === null) {
-      uni(id, function(err, id) {
-        if (err === null) {
-          callback(null, id);
-        } else {
-          callback(err);
-        }
-      });
+      // Unify
+      uni(id, callback);
     } else {
       callback(err);
     }
   });
 };
+
