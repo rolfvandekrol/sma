@@ -214,7 +214,7 @@ Status.prototype.when = function(callback) {
   }
 };
 
-var convert = exports.convert = function (type, id, callback) {
+var analyse = exports.analyse = function (type, id, callback) {
   var target, i,
       options = {},
       result = [],
