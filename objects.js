@@ -1,10 +1,25 @@
+    // Regular expressions to recognize objects (module:type:id) and type 
+    // definitions (module:type).
 var objectRegexp = /^([a-z]+):([a-z]+):.*$/i,
     typeRegexp = /^([a-z]+):([a-z]+)$/i,
     
-    SOURCE = 'source',
-    TARGET = 'target',
+    // Conversion methods. When we are doing a direct conversion from a type A
+    // object to a type B object then ...
+    SOURCE = 'source', // ... A knows how to convert to B
+    TARGET = 'target', // ... B knows how to convert from A.
+    
+    // Sort of dummy conversion method. In the method list in the 
+    // conversionTree, this means that we reached the final conversion step.
     GOAL = 'goal',
     
+    /**
+     * Simple function that tells us whether an item is in an array or not.
+     * TODO: refactor this into a generic library
+     *
+     * @param array a
+     * @param mixed i
+     * @return bool
+     */
     inarray = function(a, i) {
       var j;
       for (j in a) {
@@ -16,20 +31,33 @@ var objectRegexp = /^([a-z]+):([a-z]+):.*$/i,
       return false;
     },
     
+    // list of all available objects types to convert between. Keys are type
+    // definition strings (module:type) and values are object definition 
+    // constructs that contain all the validation, unification and conversion
+    // functions.
     conversionTypes = (
       function () {
+            // file system module
         var fs = require('fs'),
+            // prepare empty result
             types = {},
-            
+            // regular expression to match the filename of a javascript file
             js = /([a-z]+)\.js/,
+            
+            // read the names of all files in the objects dir, relative to this
+            // script
             filenames = fs.readdirSync(__dirname + '/objects'),
-            files = {},
+            
             m, key, file;
         
         for (i in filenames) {
+          // match filename with filename regular expression
           m = filenames[i].match(js);
           if (m) {
+            // execute file
             file = require('./objects/' + m[1]);
+            
+            // loop over all types and register them in the type list.
             for (key in file) {
               types[m[1] + ':' + key] = file[key];
             }
@@ -39,6 +67,7 @@ var objectRegexp = /^([a-z]+):([a-z]+):.*$/i,
         return types;
       }
     ()),
+    
     conversionTree = (
       function(types) {
         var paths = {};
