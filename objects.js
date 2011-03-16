@@ -31,33 +31,33 @@ var objectRegexp = /^([a-z]+):([a-z]+):.*$/i,
       return false;
     },
     
-    // list of all available objects types to convert between. Keys are type
+    // List of all available objects types to convert between. Keys are type
     // definition strings (module:type) and values are object definition 
     // constructs that contain all the validation, unification and conversion
     // functions.
     conversionTypes = (
       function () {
-            // file system module
+            // File system module
         var fs = require('fs'),
-            // prepare empty result
+            // Prepare empty result
             types = {},
-            // regular expression to match the filename of a javascript file
+            // Regular expression to match the filename of a javascript file
             js = /([a-z]+)\.js/,
             
-            // read the names of all files in the objects dir, relative to this
+            // Read the names of all files in the objects dir, relative to this
             // script
             filenames = fs.readdirSync(__dirname + '/objects'),
             
             m, key, file;
         
         for (i in filenames) {
-          // match filename with filename regular expression
+          // Match filename with filename regular expression
           m = filenames[i].match(js);
           if (m) {
-            // execute file
+            // Execute file
             file = require('./objects/' + m[1]);
             
-            // loop over all types and register them in the type list.
+            // Loop over all types and register them in the type list.
             for (key in file) {
               types[m[1] + ':' + key] = file[key];
             }
@@ -68,83 +68,143 @@ var objectRegexp = /^([a-z]+):([a-z]+):.*$/i,
       }
     ()),
     
+    // List of the working conversion paths between types. Keys are source type
+    // definition strings (module:type) and values are objects, where keys are
+    // type definition strings (module:type) and values are path definition
+    // objects.
     conversionTree = (
       function(types) {
-        var paths = {};
-        var done = {};
-        
-        var find = function(type) {
-          var key;
-          
-          done[type] = true;
-          
-          for (key in types) {
-            // we prefer from logic, because we assume the target knows better
-            // how to convert to itself, than the source knows how to convert
-            // to a target
-            if (types[key].convert !== undefined && types[key].convert.from !== undefined && types[key].convert.from[type] !== undefined) {
-              // from logic
-              if (register(type, key, TARGET)) {
-                find(key);
+            // Prepare empty result
+        var paths = {},
+            // Keep track of the type that we already ran 'find' on, to prevent
+            // the detection from going wild.
+            done = {},
+            
+            // Starts from a given point and traverses all available conversion
+            // paths, recursively
+            find = function(type) {
+              var key;
+              
+              // Register this type as done
+              done[type] = true;
+              
+              // Loop over all available types
+              for (key in types) {
+                // Check whether a conversion path is available from 'type' to
+                // 'key'.
+                // We prefer from logic, because we assume the target knows 
+                // better how to convert to itself, than the source knows how to
+                // convert to a target.
+                if (types[key].convert !== undefined && 
+                    types[key].convert.from !== undefined && 
+                    types[key].convert.from[type] !== undefined
+                ) {
+                  // Register from logic in paths. If something changed we 
+                  // traverse further to the 'key'.
+                  if (register(type, key, TARGET)) {
+                    find(key);
+                  }
+                } else if (types[type].convert !== undefined && 
+                           types[type].convert.to !== undefined && 
+                           types[type].convert.to[key] !== undefined
+                ) {
+                  // Register to logic in paths. If something changed we 
+                  // traverse further to the 'key'.
+                  if(register(type, key, SOURCE)) {
+                    find(key);
+                  }
+                }
               }
-            } else if (types[type].convert !== undefined && types[type].convert.to !== undefined && types[type].convert.to[key] !== undefined) {
-              // to logic
-              if(register(type, key, SOURCE)) {
-                find(key);
+            },
+            
+            // Register a conversion step in the paths.
+            register = function(s, t, method) {
+                  // Prepare return value. This will be set to true when we
+                  // change something
+              var added = false,
+                  key;
+              
+              // Prepare object to store our path in.
+              if (paths[s] === undefined) {
+                paths[s] = {};
               }
-            }
-          }
-        };
-        
-        var register = function(s, t, method) {
-          var added = false,
-              item = {'route': [s,t], 'method': [method, GOAL]},
-              key;
-          
-          if (paths[s] === undefined) {
-            paths[s] = {};
-          }
-          
-          if ((paths[s][t] === undefined) || (paths[s][t].route.length > 2)) {
-            paths[s][t] = item;
-            added = true;
-          }
-          
-          for (key in paths) {
-            if (paths[key][s] !== undefined) {
-              if (!inarray(paths[key][s].route, t) && ((paths[key][t] === undefined) || (paths[key][t].route.length > (paths[key][s].route.length + 1)))) {
-                subregister(paths[key][s], t, method);
+              
+              // If our path has not ben registered yet, or if the registered
+              // path is not a direct path, we register our path.
+              if ((paths[s][t] === undefined) || 
+                  (paths[s][t].route.length > 2)
+              ) {
+                paths[s][t] = {'route': [s,t], 'method': [method, GOAL]};
                 added = true;
               }
-            }
-          }
-          
-          return added;
-        };
+              
+              // Loop over the existing paths to find paths ending in our 
+              // source path
+              for (key in paths) {
+                if (paths[key][s] !== undefined) {
+                  // If our target is not already part of the found path and
+                  // if no path from the start to our target has been defined
+                  // or the registered path is longer than the path we are about
+                  // to register.
+                  if (!inarray(paths[key][s].route, t) && 
+                     ((paths[key][t] === undefined) || 
+                      (paths[key][t].route.length > 
+                        (paths[key][s].route.length + 1))
+                     )
+                  ) {
+                    // Create a new path, based on the path to our source which
+                    // extends it with the step to our target.
+                    subregister(paths[key][s], t, method);
+                    added = true;
+                  }
+                }
+              }
+              
+              return added;
+            },
+            
+            // Register root path, that defines a dummy conversion path with
+            // source == target
+            registerRoot = function(type) {
+              if (paths[type] === undefined) {
+                paths[type] = {};
+              }
+              
+              paths[type][type] = {
+                'route': [type],
+                'method': [GOAL]
+              };
+            },
+            
+            // Register a path that is based on another path. Extends given
+            // original path with a new target and conversion method.
+            subregister = function(orig, target, method) {
+              // Copy original path
+              var item = {
+                route: orig.route.slice(0), 
+                method: orig.method.slice(0)
+              };
+              
+              // Add target
+              item.route.push(target);
+              
+              // Add method. The method that should not be the last method, but
+              // the second last method. The last method should be GOAL.
+              item.method.push(GOAL);
+              item.method[item.method.length-2] = method;
+              
+              // Register new path
+              paths[orig.route[0]][target] = item;
+            },
+            
+            key;
         
-        var registerRoot = function(type) {
-          if (paths[type] === undefined) {
-            paths[type] = {};
-          }
-          
-          paths[type][type] = {
-            'route': [type],
-            'method': [GOAL]
-          };
-        };
-        
-        var subregister = function(orig, target, method) {
-          var item = {route: orig.route.slice(0), method: orig.method.slice(0)};
-          item.route.push(target);
-          item.method.push(GOAL);
-          item.method[item.method.length-2] = method;
-          
-          paths[orig.route[0]][target] = item;
-        };
-        
-        var key;
+        // Loop all types
         for (key in types) {
+          // Register root path
           registerRoot(key);
+          
+          // If this type has not been traversed yet, we start the traversing.
           if (done[key] === undefined) {
             find(key);
           }
@@ -154,35 +214,52 @@ var objectRegexp = /^([a-z]+):([a-z]+):.*$/i,
       }
     (conversionTypes)),
     
+    // List of preferred conversion paths. Uses the outweighs parameter to 
+    // identify this.
     conversionLogic = (
       function(types) {
+            // Prepare empty result
         var output = {},
-            key;
-        
-        var construct = function(type, self) {
-          var key, key2, result2,
-              result = [];
-          
-          if (self === undefined || self === true) {
-            result.push(type);
-          }
-          
-          for (key in types) {
-            if (types[key].outweighs !== undefined) {
-              if (inarray(types[key].outweighs, type)) {
-                result.push(key);
-                
-                result2 = construct(key, false);
-                for (key2 in result2) {
-                  result.push(result2[key2]);
+            
+            // Build the list of preferred paths for a type. If self is true
+            // the dummy route to the type itself is also included. This 
+            // parameter (default true) is false when recursively called.
+            construct = function(type, self) {
+                  // Prepare empty result
+              var result = [],
+                  
+                  key, key2, result2;
+                  
+              // include type itself as possible target if self is true
+              if (self === undefined || self === true) {
+                result.push(type);
+              }
+              
+              // loop over all types
+              for (key in types) {
+                // If found type outweight the type we're looking at
+                if (types[key].outweighs !== undefined && 
+                    inarray(types[key].outweighs, type)
+                ) {
+                    // Add the found type to the possible targets
+                    result.push(key);
+                    
+                    // Find the types that outweight the found type and add
+                    // those too.
+                    result2 = construct(key, false);
+                    for (key2 in result2) {
+                      result.push(result2[key2]);
+                    }
+                  }
                 }
               }
-            }
-          }
-          
-          return result;
-        };
+              
+              return result;
+            },
+            
+            key;
         
+        // Loop all types
         for (key in types) {
           output[key] = construct(key);
         }
