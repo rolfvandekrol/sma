@@ -1,3 +1,6 @@
 [submodule "lib/async"]
 	path = lib/async
 	url = git://github.com/rolfvandekrol/async.git
+[submodule "lib/twitter"]
+	path = lib/twitter
+	url = git://github.com/technoweenie/twitter-node.git
