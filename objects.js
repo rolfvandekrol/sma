@@ -268,9 +268,29 @@ var objectRegexp = /^([a-z]+):([a-z]+):.*$/i,
       }
     )(conversionTypes);
 
+/**
+ * Status container. Based on promise code from kriszyp, but much simpler.
+ * 
+ * A status object has 3 statuses. When pending, it is waiting for an operation
+ * to be finished. When resolved, the operation is finished and succeeded. In
+ * general the operation results in some value that is stored in the status 
+ * object. When rejected, the operation is finished, but resulted in an error.
+ * The error message is saved into the status object.
+ * The basic idea is that a piece of code can create a status object which 
+ * in which it will store the result of some asynchronous operation. Even when
+ * the operation has not finished yet, some other code can register a callback
+ * on the status object, that will be called when the status object received
+ * data.
+ *
+ * TODO: Refactor this to a separate library.
+ */
 var Status = function(value) {
+  // Create empty list for the callbacks
   this.callbacks = [];
   
+  // If a value is specified at construction, the object is already resolved.
+  // This is useful when some start data is always available, but you want to
+  // handle it the same way as asynchronously created intermediate data.
   if (value === undefined) {
     this.status = Status.PENDING;
   } else {
@@ -278,20 +298,26 @@ var Status = function(value) {
     this.value = value;
   }
 };
+// Statuses for the status objects
 Status.PENDING = 0;
 Status.RESOLVED = 1;
 Status.REJECTED = -1;
 
+// Call this method when the operation, that the status object is waiting for, 
+// succeeded.
 Status.prototype.resolve = function(value) {
   this.status = Status.RESOLVED;
   this.value = value;
   this.notifyAll();
 };
+// Call this method when the operation, that the status object is waiting for,
+// failed.
 Status.prototype.reject = function(msg) {
   this.status = Status.REJECTED;
   this.error = new Error(msg);
   this.notifyAll();
-}
+};
+// Notify all callback of the status
 Status.prototype.notifyAll = function() {
   var i;
   
@@ -299,19 +325,24 @@ Status.prototype.notifyAll = function() {
     this.notify(this.callbacks[i]);
   }
 };
+// Notify a callback of the status.
 Status.prototype.notify = function(callback) {
   var self = this;
   
+  // if resolved, send the value
   if (this.status === Status.RESOLVED) {
     process.nextTick(function() {
       callback(null, self.value);
     });
+  // if failed, send the error
   } else {
     process.nextTick(function() {
       callback(self.error);
     });
   }
 };
+// Register a callback, that will be notified when the operation the status
+// object is waiting for is finished.
 Status.prototype.when = function(callback) {
   if (this.status === Status.PENDING) {
     this.callbacks.push(callback);
