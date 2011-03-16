@@ -294,6 +294,14 @@ var convert = function(results, type, target, callback) {
     })(parseInt(i));
   }
 };
+
+exports.convert = function(s, id, t, callback) {
+  var results = {};
+  results[s] = new Status(id);
+  
+  convert(results, s, t, callback);
+}
+
 var analyse = exports.analyse = function (type, id, callback) {
   var target, i,
       options = {},
