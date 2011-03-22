@@ -1,4 +1,8 @@
-
-var message = exports.message = function (client_id, service, uid, message) {
-  ;
+exports.message = function (object) {
+  var type = object.type,
+      id = object.id;
+  
+  
 };
+
+
