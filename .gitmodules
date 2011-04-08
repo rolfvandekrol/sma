@@ -1,3 +1,6 @@
 [submodule "lib/async"]
 	path = lib/async
 	url = git://github.com/rolfvandekrol/async.git
+[submodule "lib/sharedjs"]
+	path = lib/sharedjs
+	url = https://github.com/kof/sharedjs.git
